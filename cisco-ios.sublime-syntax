@@ -755,12 +755,14 @@ variables:
       (?:BVI)|
       (?:Ethernet)|
       (?:Et)|
+      (?:Embedded-Service-Engine)|
       (?:FastEthernet)|
       (?:Fa)|
       (?:FortyGigabitEthernet)|
       (?:Fo)|
       (?:GigabitEthernet)|
       (?:Gi)|
+      (?:ISM)|
       (?:loopback)|
       (?:lo)|
       (?:port-channel)|
@@ -835,7 +837,7 @@ variables:
       (?:disk(?:[0-3])?)
     )
   uri: '(?<protocol>(?:t?ftp)|scp)(?<protocol_seperator>://)(?<hostname>(?:\d+\.){3}\d+)(?<path>\/\S*)'
-  locations: '(?:{{drive}}|{{uri}})'
+  locations: '(?:{{drives}}|{{uri}})'
 
 contexts:
 
@@ -1031,6 +1033,7 @@ contexts:
     - include: standard_acl
     - include: extended_acl_old
     - include: route_map
+    - include: voice
     # - include: partials
 
 
@@ -2914,7 +2917,9 @@ contexts:
                 (trunk-status)
               )
             )|
-            (?:(vpc)\s+(\d+))
+            (?:(vpc)\s+(\d+))|
+            (?:(ip\s+virtual-reassembly\s+\w+))|
+            (?:(h323-gateway\s+voip.+))
           )
         captures:
           1: comment.line                                  # Description
@@ -2994,6 +2999,8 @@ contexts:
           75: support.constant                             # logging event trunk-status
           76: support.constant                             # vpc
           77: constant.numeric                             # vpc id
+          78: support.constant                             # ip virtual-reassembly
+          79: support.constant                             #  h323-gateway
       - include: pop_on_configure_terminal_context
       # - include: partials
 
@@ -3793,3 +3800,350 @@ contexts:
       captures:
         1: support.constant
         2: support.constant
+  #Voice/VoIP/CME
+  voice:
+    - include: ephone
+    - include: ephone_dn
+    - include: ephone_template
+    - include: mgcp
+    - include: sccp
+    - include: telephony_service
+    - include: voice_dial_peer
+    - include: voice_port_block
+
+  ephone:
+    - match: >
+        (?xi)
+        ^\s*
+        (?:
+          (ephone)\s+(\d+)
+
+        )
+      captures:
+        0: cisco.scope
+        1: variable.parameter
+        2: constant.numeric
+        3: string.unquoted
+      push:
+        - meta_content_scope: text.network.cisco.voice.ephone
+        - match: |
+            (?xi)
+            ^\s*
+            (?:
+              (mac\-address)\s+({{mac_address}})|
+              (type)\s+(.+)$|
+              (ephone\-template)\s+(\d+)$|
+              (button)\s+(.*)$|
+            )
+          captures:
+            0: cisco.scope
+            1: support.constant
+            2: constant.numeric.mac
+            3: support.constant
+            4: string.unquoted
+            5: support.constant
+            6: constant.numeric
+            7: support.constant
+            8: string.unquoted
+
+  ephone_dn:
+    - match: >
+        (?xi)
+        ^\s*
+        (?:
+          (ephone\-dn)\s+(\d+)\s+([\w\-\d]+)|
+          (ephone\-dn)\s+(\d+)
+
+
+        )
+      captures:
+        0: cisco.scope
+        1: variable.parameter
+        2: constant.numeric
+        3: string.unquoted
+        4: variable.parameter
+        5: constant.numeric
+
+      push:
+        - meta_content_scope: text.network.cisco.voice.ephone_dn
+        - match: |
+            (?xi)
+            ^\s*
+            (?:
+              (number)\s+([\d\+\.]+)|
+              (label|description|name)\s+(.+)$|
+              (call\-forward)\s+(\w+)\s+([\d\.\+]+)|
+              (timeouts)\s+([\w\-]+)\s+(\d+)|
+              (preference)\s+(\d+)
+            )
+          captures:
+            0: cisco.scope
+            1: support.constant
+            2: constant.numeric.mac
+            3: support.constant
+            4: string.unquoted
+            5: support.constant
+            6: string.unquoted
+            7: constant.numeric
+            8: support.constant
+            9: string.unquoted
+            10: constant.numeric
+            11: support.constant
+            12: constant.numeric
+
+  ephone_template:
+    - match: >
+        (?xi)
+        ^\s*
+        (?:
+          (ephone\-template)\s+(\d+)
+        )
+      captures:
+        0: cisco.scope
+        1: variable.parameter
+        2: constant.numeric
+
+      push:
+        - meta_content_scope: text.network.cisco.voice.ephone_template
+        - match: |
+            (?xi)
+            ^\s*
+            (?:
+              (softkeys)\s+([\w\-]+)\s+(.+)$|
+              (features)\s+([\w\-]+)\s+(.*)$
+
+            )
+          captures:
+            0: cisco.scope
+            1: support.constant
+            2: keyword.other
+            3: string.unquoted
+            4: support.constant
+            5: keyword.other
+            6: string.unquoted
+
+  #MGCP
+  mgcp:
+    - match: >
+        (?xi)
+        ^\s*
+        (?:
+          (mgcp)\s+
+          (.*)
+
+        )
+      captures:
+        0: cisco.scope
+        1: variable.parameter
+        2: support.constant
+
+  #MGCP
+  sccp:
+    - match: >
+        (?xi)
+        ^\s*
+        (?:
+          (sccp$)|
+          (sccp)\s+
+          (?:
+            (local)\s+({{interface_names}})\s*({{interface_numbers}})|
+            (ccm)\s+({{ip}})\s+(identifier)\s+(\d+)\s+(version)\s+(\d\.\d)
+          )
+        )
+      captures:
+        0: cisco.scope
+        1: variable.parameter
+        2: variable.parameter
+        3: support.constant
+        4: entity.other.attribute-name
+        5: constant.numeric
+        6: support.constant
+        7: constant.numeric.target_ip
+        8: support.constant
+        9: constant.numeric
+        10: support.constant
+        11: constant.numeric
+
+  telephony_service:
+    - match: >
+        (?xi)
+        ^\s*
+        (?:
+          (telephony\-service)
+        )
+      captures:
+        0: cisco.scope
+        1: variable.parameter
+      push:
+        - meta_content_scope: text.network.cisco.voice.telephony_service
+        - match: |
+            (?xi)
+            ^\s*
+            (?:
+              (sdspfarm\s+units)\s+(\d+)|
+              (sdspfarm\s+transcode)\s+(\w+)\s+(\d+)|
+              (sdspfarm\s+tag)\s+(\d+)\s+([\d\w]+)|
+              (max\-.*)\s+(\d+)$|
+              (system\smessage)\s+(.+)$|
+              (olsontimezone)\s+(.+)\s+(version)\s+(.+)$|
+              (after\-hours\s+block\s+pattern)\s+(\d+)\s+(.+)\s+(.+)$|
+              (voicemail)\s+(\d+)$|
+              (dialplan\-pattern)\s+(\d+)\s+(.+)\s+(extension\-length)\s+(\d+)$|
+              (service\s+phone)\s+(.+)\s+(.+)$|
+              (time\-zone)\s+(\d+)$|
+              (timeouts)\s+([\w\-]+)\s+(\d+)$|
+              (ip\ssource\-address)\s+({{ip}})\s+(port)\s+(\d+)$|
+              (multicast\smoh)\s+({{ip}})\s+(port)\s+(\d+)$|
+
+            )
+          captures:
+            1: support.constant
+            2: constant.numeric
+            3: support.constant
+            4: support.constant
+            5: constant.numeric
+            6: support.constant
+            7: constant.numeric
+            8: string.unquoted
+            9: support.constant
+            10: constant.numeric
+            11: support.constant
+            12: string.unquoted
+            13: support.constant
+            14: string.unquoted
+            15: support.constant
+            16: constant.numeric
+            17: support.constant
+            18: constant.numeric
+            19: string.unquoted
+            20: support.constant
+            21: support.constant
+            22: constant.numeric
+            23: support.constant
+            24: constant.numeric
+            25: string.unquoted
+            26: support.constant
+            27: constant.numeric
+            28: support.constant
+            29: string.unquoted
+            30: constant.numeric
+            31: support.constant
+            32: constant.numeric
+            33: support.constant
+            34: string.unquoted
+            35: constant.numeric
+            36: support.constant
+            37: constant.numeric.target_ip
+            38: support.constant
+            39: constant.numeric
+            40: support.constant
+            41: constant.numeric.target_ip
+            42: support.constant
+            43: constant.numeric
+
+
+  voice_dial_peer:
+    - match: >
+        (?xi)
+        ^\s*
+        (?:
+          (dial\-peer)\s+(\w+)\s+(\d+)\s+(\w+)
+        )
+      captures:
+        0: cisco.scope
+        1: variable.parameter
+        2: support.constant
+        3: constant.numeric
+        4: support.constant
+      push:
+      - meta_content_scope: text.network.cisco.voice.dial_peer
+      - match: |
+          (?xi)
+          ^\s*
+          (?:
+            (?:(description.*))|
+            (shut(?:down)?)|
+            (?:(preference)\s+(\d+))|
+            (?:(translation\-profile)\s+(?:(incoming)|(outgoing))\s+(\w+))|
+            (?:(destination\-pattern)\s+(.*))|
+            (?:(port)\s*({{interface_numbers}}))|
+            (?:(service)\s+(\w+))
+
+
+          )
+        captures:
+          1: comment.line
+          2: keyword.other
+          3: support.constant
+          4: constant.numeric
+          5: support.constant
+          6: entity.other.attribute-name
+          7: keyword.other
+          8: string.unquoted
+          9: support.constant
+          10: string.unquoted
+          11: support.constant
+          12: constant.numeric
+          13: support.constant
+          14: string.unquoted
+
+      - include: pop_on_configure_terminal_context
+  #Voice-Port 0/1/0
+  voice_port_block:
+    - match: >
+        (?xi)
+        ^\s*
+        (?:
+          (voice-port)\s+
+          (?:
+            (?:(range)\s*({{interface_number_ranged}}))|
+            \s*({{interface_numbers}})
+          )
+        )
+      captures:
+        0: cisco.scope.interface
+        1: variable.parameter               # interface
+        2: support.constant               # range
+        3: entity.other.attribute-name    # interface name
+        4: constant.numeric               # interface number
+        5: entity.other.attribute-name    # interface name
+        6: constant.numeric               # interface number
+      push:
+      - meta_content_scope: text.network.cisco.voice.port
+      - match: |
+          (?xi)
+          ^\s*
+          (?:
+            (?:(description.*))|
+            (shut(?:down)?)|
+            (?:(input\s+gain)\s+(?:(-\d+)|(\d+)))|
+            (?:(signal))|
+            (?:(impedance)\s+(\w+))|
+            (?:(connection))|
+            (?:(caller-id)\s+(enable))|
+            (?:(timeouts)\s+([\w\-]+)\s+(\d+|\w+))
+
+
+
+          )
+        captures:
+          1: comment.line                                  # Description\
+          2: keyword.other                                # shutdown
+          3: support.constant
+          4: keyword.other
+          5: entity.other.attribute-name
+          6: support.constant
+          7: support.constant
+          8: entity.other.attribute-name
+          9: support.constant
+          10: support.constant
+          11: entity.other.attribute-name
+          12: support.constant
+          13: string.unquoted
+          14: constant.numeric
+
+      - include: pop_on_configure_terminal_context
+      # - include: partials
+
+      #    6: entity.other.attribute-name                  # permit
+      #  7: keyword.other                                # deny
